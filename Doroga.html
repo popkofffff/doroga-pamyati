@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дорога памяти</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  #map { width: 100%; height: 90vh; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<header class="text-center p-6">
+  <h1 class="text-4xl font-bold mb-2">Дорога памяти</h1>
+  <p class="text-lg text-gray-700">Города-герои и города трудовой доблести Великой Отечественной войны</p>
+</header>
+
+<div id="map"></div>
+
+<!-- Карточка информации -->
+<div id="info-card" class="fixed top-20 left-1/2 -translate-x-1/2 w-96 bg-white p-4 rounded-lg shadow-lg border border-gray-200 hidden z-50">
+  <button id="close-card" class="text-gray-500 float-right hover:text-gray-800">&times;</button>
+  <h2 id="info-title" class="text-2xl font-bold mb-2"></h2>
+  <p id="info-desc" class="text-gray-700 mb-2"></p>
+  <div id="info-photos" class="grid grid-cols-1 gap-2 mb-2"></div>
+  <ul id="info-memories" class="list-disc list-inside text-gray-600"></ul>
+</div>
+
+<script>
+// === Данные городов ===
+const places = [
+  // Города-герои
+  {type:'hero', name:'Брестская крепость', lat:52.0976, lng:23.7341, description:'Легендарная крепость, которая приняла первый удар войны.', photos:['https://upload.wikimedia.org/wikipedia/commons/5/57/Brest_Fortress.jpg'], memories:['Мы стояли насмерть, никто не думал об отступлении.']},
+  {type:'hero', name:'Киев', lat:50.4501, lng:30.5234, description:'Выдержал героическую оборону, несмотря на превосходство противника.', photos:['https://upload.wikimedia.org/wikipedia/commons/2/26/Kiev1941.jpg'], memories:['Защитники Киева сражались до последнего.']},
+  {type:'hero', name:'Ленинград', lat:59.9311, lng:30.3609, description:'Пережил почти 900-дневную блокаду, но не сдался.', photos:['https://upload.wikimedia.org/wikipedia/commons/4/42/Siege_of_Leningrad.jpg'], memories:['Самым страшным был голод. Но мы выстояли.']},
+  {type:'hero', name:'Москва', lat:55.7558, lng:37.6173, description:'Столица, оборона которой стала переломным моментом в войне.', photos:['https://upload.wikimedia.org/wikipedia/commons/9/99/Moscow1941parade.jpg'], memories:['Мы стояли насмерть: за нами — Москва, за нами — Родина.']},
+  {type:'hero', name:'Минск', lat:53.9006, lng:27.5590, description:'Сопротивление в окружении и подпольная борьба.', photos:['https://upload.wikimedia.org/wikipedia/commons/d/dc/Minsk1944.jpg'], memories:['Каждый второй житель Минска участвовал в подпольной работе.']},
+  {type:'hero', name:'Одесса', lat:46.4825, lng:30.7233, description:'Стойкая оборона города, который был в осаде.', photos:['https://upload.wikimedia.org/wikipedia/commons/5/5c/Odessa1941.jpg'], memories:['Одесса выстояла, и мы гордились этим.']},
+  {type:'hero', name:'Севастополь', lat:44.6167, lng:33.5254, description:'Героическая оборона главной базы Черноморского флота.', photos:['https://upload.wikimedia.org/wikipedia/commons/9/98/Sevastopol1942.jpg'], memories:['Каждый камень города дышал войной.']},
+  {type:'hero', name:'Сталинград', lat:48.7080, lng:44.5133, description:'Место одной из самых кровопролитных битв, изменившей ход войны.', photos:['https://upload.wikimedia.org/wikipedia/commons/2/2f/MamayevKurgan.jpg'], memories:['За Волгой для нас земли не было.']},
+  {type:'hero', name:'Новороссийск', lat:44.7230, lng:37.7683, description:'Выдержал жестокие бои за «Малую землю».', photos:['https://upload.wikimedia.org/wikipedia/commons/e/e5/Novorossiysk1942.jpg'], memories:['Бои были адом, но город выстоял.']},
+  {type:'hero', name:'Керчь', lat:45.3556, lng:36.4667, description:'Город, в котором шли ожесточенные бои за Крым.', photos:['https://upload.wikimedia.org/wikipedia/commons/8/81/Kerch_WW2.jpg'], memories:['Крым был нашей крепостью.']},
+  {type:'hero', name:'Тула', lat:54.1920, lng:37.6156, description:'Остановила наступление немецких войск на Москву.', photos:['https://upload.wikimedia.org/wikipedia/commons/8/8b/Tula1941.jpg'], memories:['Оборона Тулы была вкладом в спасение Москвы.']},
+  {type:'hero', name:'Смоленск', lat:54.7818, lng:32.0401, description:'Его оборона задержала продвижение врага вглубь страны.', photos:['https://upload.wikimedia.org/wikipedia/commons/a/a1/Smolensk1941.jpg'], memories:['Смоленск принял на себя удар ради всей страны.']},
+  {type:'hero', name:'Мурманск', lat:68.9585, lng:33.0827, description:'Важный порт, обеспечивавший поставки по ленд-лизу.', photos:['https://upload.wikimedia.org/wikipedia/commons/7/70/Murmansk1942.jpg'], memories:['Мы работали под бомбёжками, но снабжение шло.']},
+
+  // Города трудовой доблести
+  {type:'labor', name:'Казань', lat:55.7961, lng:49.1064, description:'Центр авиационной промышленности.', photos:['https://upload.wikimedia.org/wikipedia/commons/0/0c/Kazan_aircraft.jpg'], memories:['Наш труд был оружием Победы.']},
+  {type:'labor', name:'Магнитогорск', lat:53.4072, lng:58.9791, description:'Здесь производился каждый второй танк и каждый третий снаряд.', photos:['https://upload.wikimedia.org/wikipedia/commons/2/2f/Magnitogorsk1943.jpg'], memories:['Мы работали по 16 часов в сутки.']},
+  {type:'labor', name:'Нижний Тагил', lat:57.9167, lng:59.9667, description:'Центр выпуска танков Т-34.', photos:['https://upload.wikimedia.org/wikipedia/commons/7/77/T34_Uralvagonzavod.jpg'], memories:['Первый танк с завода — как праздник.']},
+  {type:'labor', name:'Новосибирск', lat:55.0084, lng:82.9357, description:'Крупный промышленный центр тыла.', photos:['https://upload.wikimedia.org/wikipedia/commons/5/50/Novosibirsk1943.jpg'], memories:['Весь город работал как единый механизм.']},
+  {type:'labor', name:'Самара (Куйбышев)', lat:53.1959, lng:50.1008, description:'«Запасная столица», куда были перевезены предприятия.', photos:['https://upload.wikimedia.org/wikipedia/commons/1/1b/Kuybyshev1941.jpg'], memories:['Мы помогали фронту, работая в тылу.']},
+  {type:'labor', name:'Челябинск', lat:55.1604, lng:61.4026, description:'«Танкоград» — крупнейший центр танкостроения.', photos:['https://upload.wikimedia.org/wikipedia/commons/2/2d/Chelyabinsk1942.jpg'], memories:['Мы спали прямо в цехах у станков.']},
+  {type:'labor', name:'Екатеринбург (Свердловск)', lat:56.8389, lng:60.6057, description:'Город, где работало множество эвакуированных заводов.', photos:['https://upload.wikimedia.org/wikipedia/commons/9/9b/Ekaterinburg1943.jpg'], memories:['Наш город стал вторым домом для тысяч людей.']},
+  {type:'labor', name:'Горький (Нижний Новгород)', lat:56.2965, lng:43.9361, description:'Крупнейший центр машиностроения.', photos:['https://upload.wikimedia.org/wikipedia/commons/7/7c/Gorky1942.jpg'], memories:['Вся страна зависела от наших заводов.']},
+  {type:'labor', name:'Ижевск', lat:56.8522, lng:53.2116, description:'Производил стрелковое оружие для фронта.', photos:['https://upload.wikimedia.org/wikipedia/commons/8/8a/Izhevsk1942.jpg'], memories:['Все работали ради общей цели — победы.']},
+  {type:'labor', name:'Пермь', lat:58.0105, lng:56.2502, description:'Важный центр артиллерийского производства.', photos:['https://upload.wikimedia.org/wikipedia/commons/6/6e/Perm1942.jpg'], memories:['Мы делали снаряды для фронта.']},
+  {type:'labor', name:'Томск', lat:56.4977, lng:84.9744, description:'Сюда эвакуировали заводы и институты.', photos:['https://upload.wikimedia.org/wikipedia/commons/f/f4/Tomsk1942.jpg'], memories:['Город переполнен людьми, но все помогали друг другу.']},
+  {type:'labor', name:'Омск', lat:54.9893, lng:73.3686, description:'Крупный центр оборонной промышленности.', photos:['https://upload.wikimedia.org/wikipedia/commons/0/0a/Omsk1942.jpg'], memories:['Каждый понимал, что его работа — это фронт.']}
+];
+
+// === Инициализация карты ===
+ymaps.ready(init);
+function init() {
+  const map = new ymaps.Map("map", {
+    center: [55.76, 37.64],
+    zoom: 4,
+    controls: ['zoomControl', 'fullscreenControl']
+  });
+
+  places.forEach(place => {
+    const color = place.type === 'hero' ? 'red' : 'orange';
+    const placemark = new ymaps.Placemark([place.lat, place.lng], {
+      hintContent: place.name
+    }, {
+      preset: `islands#${color}Icon`
+    });
+
+    placemark.events.add('click', () => {
+      showInfo(place);
+    });
+
+    map.geoObjects.add(placemark);
+  });
+}
+
+// === Функции работы с карточкой информации ===
+function showInfo(place) {
+  document.getElementById('info-title').textContent = place.name;
+  document.getElementById('info-desc').textContent = place.description;
+
+  const photosDiv = document.getElementById('info-photos');
+  photosDiv.innerHTML = '';
+  place.photos.forEach(url => {
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'w-full rounded-lg shadow-sm';
+    photosDiv.appendChild(img);
+  });
+
+  const memList = document.getElementById('info-memories');
+  memList.innerHTML = '';
+  place.memories.forEach(mem => {
+    const li = document.createElement('li');
+    li.textContent = mem;
+    memList.appendChild(li);
+  });
+
+  document.getElementById('info-card').classList.remove('hidden');
+}
+
+document.getElementById('close-card').addEventListener('click', () => {
+  document.getElementById('info-card').classList.add('hidden');
+});
+</script>
+
+</body>
+</html>
